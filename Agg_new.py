@@ -5,6 +5,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score
 from scipy.cluster.hierarchy import linkage, fcluster
 import shutil
+from sklearn.decomposition import PCA
+
 
 def load_images_from_folder(folder):
     images = []
@@ -20,24 +22,35 @@ def load_images_from_folder(folder):
 
 def detect_corners(image):
     """Detect corners in the image using the Shi-Tomasi corner detector."""
-    corners = cv2.goodFeaturesToTrack(image, maxCorners=10000, qualityLevel=0.01, minDistance=10)
+    corners = cv2.goodFeaturesToTrack(image, maxCorners=64, qualityLevel=0.01, minDistance=10)
     if corners is not None:
         corners = np.int0(corners)
+        # corners = corners.reshape(-1, 2)
     return corners
 
-def extract_corner_features(images, max_corners=10000):
+def extract_corner_features(images, max_corners=32):
     features = []
     for img in images:
         corners = detect_corners(img)
         if corners is None:
             corners = np.zeros((0, 2))
-        corners = corners[:max_corners]  # Limit to max_corners
-        corner_coords = corners.flatten()
+        
+        center = (img.shape[1] // 2, img.shape[0] // 2)  # 图片中心坐标
+        
+        relative_coords = corners - center  # 计算相对坐标
+        
+        if len(corners) > max_corners:
+            relative_coords = relative_coords[:max_corners]  # 限制最大角点数量
+        
+        corner_coords = relative_coords.flatten()  # 展平为一维数组
+
+        white_pixel_count = np.sum(img)  # 计算二值图像中白色像素点的数量
         
         # Ensure the feature vector has a consistent length
-        feature = np.hstack(([len(corners)], corner_coords))
-        if len(feature) < (2 * max_corners + 1):
-            feature = np.hstack((feature, np.zeros((2 * max_corners + 1) - len(feature))))
+        # feature = np.hstack(([len(corners)], (0.00001*white_pixel_count).astype(int), corner_coords,))
+        feature = corner_coords
+        if len(feature) < (2 * max_corners + 2):
+            feature = np.hstack((feature, np.zeros((2 * max_corners + 2) - len(feature))))
         
         features.append(feature)
     
@@ -76,7 +89,7 @@ def save_clustered_images(folder, images, filenames, labels, num_clusters):
         cluster_folder = os.path.join(folder, f'cluster_{label}')
         cv2.imwrite(os.path.join(cluster_folder, filename), img)
 
-def main(input_folder, output_folder, max_clusters=20, max_corners=10000):
+def main(input_folder, output_folder, max_clusters=20, max_corners=64):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
     
@@ -90,7 +103,47 @@ def main(input_folder, output_folder, max_clusters=20, max_corners=10000):
     print(f"Optimal number of clusters: {optimal_clusters}")
 
 if __name__ == "__main__":
-    input_folder = "dataset_patches"
-    output_folder = "output_agg_large"
+    input_folder = "random_10000"
+    output_folder = "output_agg_new_10000"
     
-    main(input_folder, output_folder, max_clusters=30, max_corners=10000)
+    main(input_folder, output_folder, max_clusters=20, max_corners=64)
+    # image_path = "F:/code/keypoint/patid_MX_Benchmark2_clip_nonhotspot1_6_orig_0_patches_patch_665.png"
+    # img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    # print(img.shape)
+    # corners = detect_corners(img)
+    # center = (100,100)  # 图片中心坐标
+    # relative_coords = corners - center  # 计算相对坐标
+    # corner_coords = relative_coords.flatten()  # 展平为一维数组
+    # white_pixel_count = np.sum(img)  # 计算二值图像中白色像素点的数量
+    # pca = PCA(n_components=2)
+    # pca_features = pca.fit_transform(relative_coords)
+    # pca_features = pca_features.flatten()
+    # feature = np.hstack(([len(corners)], pca_features, (0.00001*white_pixel_count).astype(int)))
+    
+    # print(len(corners))
+    # print(corners)
+    # print(feature)
+
+
+
+    # def extract_corner_features(images, max_corners=64):
+#     features = []
+#     for img in images:
+#         corners = detect_corners(img)
+#         if corners is None:
+#             corners = np.zeros((0, 2))
+#         corners = corners[:max_corners]  # Limit to max_corners
+#         corner_coords = corners.flatten()
+        
+#         # Ensure the feature vector has a consistent length
+#         feature = np.hstack(([len(corners)], corner_coords))
+#         if len(feature) < (2 * max_corners + 1):
+#             feature = np.hstack((feature, np.zeros((2 * max_corners + 1) - len(feature))))
+        
+#         features.append(feature)
+    
+#     features = np.array(features)
+#     # Standardize the features
+#     scaler = StandardScaler()
+#     features = scaler.fit_transform(features)
+#     return features
